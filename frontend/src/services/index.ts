@@ -52,6 +52,17 @@ axios.defaults.headers.common['Accept'] = 'application/json';
 // Endpoints públicos que NO requieren autenticación
 const PUBLIC_ENDPOINTS = [
   '/api/registro/crear-cuenta',
+  '/api/registro/paso1-validar',
+  '/api/registro/paso2-crear-cuenta',
+  '/api/registro/check-username',
+  '/api/registro/check-email',
+  '/api/registro/check-availability',
+  '/api/registro/info',
+  '/api/registro/paso-info',
+  '/api/registro/verificar-email',
+  '/api/registro/verificar-telefono',
+  '/api/registro/reenviar-email',
+  '/api/registro/reenviar-telefono',
   '/api/auth/login',
   '/api/auth/refresh'
 ];
@@ -59,7 +70,14 @@ const PUBLIC_ENDPOINTS = [
 // Función para determinar si una URL es pública
 const isPublicEndpoint = (url: string): boolean => {
   if (!url) return false;
-  return PUBLIC_ENDPOINTS.some(endpoint => url.includes(endpoint));
+  
+  // Limpiar la URL de parámetros de query
+  const cleanUrl = url.split('?')[0];
+  
+  // Verificar si coincide exactamente o si empieza con alguno de los endpoints públicos
+  return PUBLIC_ENDPOINTS.some(endpoint => {
+    return cleanUrl === endpoint || cleanUrl.startsWith(endpoint);
+  });
 };
 
 // Función para limpiar tokens corruptos
@@ -75,6 +93,21 @@ const cleanupCorruptedTokens = () => {
     }
   }
 };
+
+// Función para limpiar completamente el localStorage (para debugging)
+const clearAllAuthData = () => {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🧹 All authentication data cleared from localStorage');
+  }
+};
+
+// Exponer función de limpieza para debugging
+if (process.env.NODE_ENV === 'development') {
+  (window as any).clearAuthData = clearAllAuthData;
+}
 
 // Limpiar tokens corruptos al inicializar
 cleanupCorruptedTokens();
@@ -180,9 +213,18 @@ axios.interceptors.response.use(
     }
     
     // No intentar renovación de token para endpoints públicos
-    if ((originalRequest as any)?.isPublicEndpoint && error.response?.status === 401) {
+    if ((originalRequest as any)?.isPublicEndpoint) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn(`⚠️ Public endpoint returned 401: ${originalRequest.url} - This might be a backend configuration issue`);
+        console.warn(`⚠️ Public endpoint error: ${originalRequest.url} - Status: ${error.response?.status}`);
+      }
+      // Para endpoints públicos, solo rechazar el error sin redirigir
+      return Promise.reject(error);
+    }
+    
+    // También verificar por URL si no se marcó como público
+    if (isPublicEndpoint(originalRequest?.url || '')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ Public endpoint by URL: ${originalRequest.url} - Status: ${error.response?.status}`);
       }
       return Promise.reject(error);
     }
@@ -229,8 +271,12 @@ axios.interceptors.response.use(
         const { authService } = await import('./authService');
         authService.logout();
         
-        // Redirigir solo si no estamos ya en login
-        if (window.location.pathname !== '/login') {
+        // Redirigir solo si no estamos ya en login o en páginas públicas
+        const publicPages = ['/login', '/register', '/'];
+        const currentPath = window.location.pathname;
+        const isOnPublicPage = publicPages.some(page => currentPath === page || currentPath.startsWith(page));
+        
+        if (!isOnPublicPage) {
           window.location.href = '/login?expired=true';
         }
         return Promise.reject(refreshError);

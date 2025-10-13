@@ -2,6 +2,7 @@ package com.example.enarm360.dtos.registrer;
 
 import jakarta.validation.constraints.*;
 import lombok.*;
+import java.time.LocalDate;
 
 @Data
 @NoArgsConstructor
@@ -33,8 +34,25 @@ public class RegistroRequest {
     @NotBlank(message = "Confirmar contraseña es obligatorio")
     private String confirmarContrasena;
     
-    // Campos opcionales del perfil
+    @NotBlank(message = "El teléfono es obligatorio")
+    @Size(min = 10, max = 20, message = "El teléfono debe tener entre 10 y 20 caracteres")
+    @Pattern(regexp = "^[+]?[0-9\\s\\-\\(\\)]+$", message = "Formato de teléfono inválido")
     private String telefono;
+    
+    // Campos del perfil (ahora obligatorios en el paso 1)
+    @NotBlank(message = "El país de nacimiento es obligatorio")
+    @Size(max = 80, message = "El país no puede exceder 80 caracteres")
+    private String paisNacimiento;
+    
+    @NotBlank(message = "El género es obligatorio")
+    @Pattern(regexp = "^(M|F|Otro)$", message = "Género debe ser M, F u Otro")
+    private String genero;
+    
+    @NotNull(message = "La fecha de nacimiento es obligatoria")
+    @Past(message = "La fecha de nacimiento debe ser en el pasado")
+    private LocalDate fechaNacimiento;
+    
+    // Campo opcional para compatibilidad
     private String pais;
     
     @AssertTrue(message = "Las contraseñas no coinciden")

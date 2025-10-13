@@ -14,4 +14,7 @@ public class UsuarioInfo {
     private Set<String> roles;
     private Set<String> permisos;
     private Boolean activo;
+    private Boolean emailVerificado;
+    private Boolean telefonoVerificado;
+    private Boolean requiereVerificacion;
 }

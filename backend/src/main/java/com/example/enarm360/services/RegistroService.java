@@ -12,8 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -31,16 +33,37 @@ public class RegistroService {
     private RolRepository rolRepository;
     
     @Autowired
+    private VerificacionEmailRepository verificacionEmailRepository;
+    
+    @Autowired
+    private VerificacionTelefonoRepository verificacionTelefonoRepository;
+    
+    @Autowired
     private PasswordEncoder passwordEncoder;
     
-  /**
+    @Autowired
+    private SmsService smsService;
+    
+    /**
  * Registrar nuevo usuario (solo estudiantes)
  */
 public RegistroResponse registrarUsuario(RegistroRequest request) {
     logger.info("Iniciando registro para: {}", request.getEmail());
     
     try {
-        // 1. Crear Usuario
+        // 1. Validar disponibilidad de telefono - permitir re-registro si no está verificado
+        Usuario usuarioExistentePorTelefono = usuarioRepository.findByTelefono(request.getTelefono()).orElse(null);
+        if (usuarioExistentePorTelefono != null) {
+            if (usuarioExistentePorTelefono.getTelefonoVerificado()) {
+                throw new IllegalArgumentException("El teléfono ya está registrado y verificado");
+            } else {
+                // Usuario existe pero no ha verificado - permitir continuar con el registro
+                logger.info("Usuario con teléfono {} existe pero no verificado, permitiendo re-registro", request.getTelefono());
+                return continuarRegistroExistente(usuarioExistentePorTelefono, request);
+            }
+        }
+        
+        // 2. Crear Usuario
         Usuario usuario = Usuario.builder()
             .email(request.getEmail().toLowerCase().trim())
             .username(request.getUsername().toLowerCase().trim())
@@ -48,37 +71,44 @@ public RegistroResponse registrarUsuario(RegistroRequest request) {
             .nombre(request.getNombre().trim())
             .apellidos(request.getApellidos() != null && !request.getApellidos().trim().isEmpty() 
                        ? request.getApellidos().trim() : null)
+            .telefono(request.getTelefono().trim())
             .activo(true)
+            .emailVerificado(false)
+            .telefonoVerificado(false)
             .build();
             
-        // 2. Asignar rol ESTUDIANTE antes de guardar
+        // 3. Asignar rol ESTUDIANTE antes de guardar
         Rol rolEstudiante = rolRepository.findByNombre("ESTUDIANTE")
             .orElseThrow(() -> new RuntimeException("Rol ESTUDIANTE no encontrado"));
         
         usuario.getRoles().add(rolEstudiante);
         
-        // 3. Guardar usuario PRIMERO
+        // 4. Guardar usuario PRIMERO
         usuario = usuarioRepository.save(usuario);
         
-        // 4. Crear PerfilUsuario con biografía por defecto
+        // 5. Crear PerfilUsuario con los nuevos datos obligatorios
         PerfilUsuario perfil = PerfilUsuario.builder()
             .usuario(usuario)
-            .telefono(request.getTelefono() != null && !request.getTelefono().trim().isEmpty() 
-                      ? request.getTelefono().trim() : null)
-            .pais(request.getPais() != null && !request.getPais().trim().isEmpty() 
-                  ? request.getPais().trim() : null)
-            // AQUÍ ESTÁ LA BIOGRAFÍA POR DEFECTO
+            .pais(request.getPaisNacimiento().trim())  // Ahora obligatorio
+            .genero(request.getGenero())               // Nuevo campo obligatorio
+            .fechaNacimiento(request.getFechaNacimiento()) // Nuevo campo obligatorio
+            // BIOGRAFÍA POR DEFECTO
             .bio("Estudiante de medicina preparándose para el ENARM. ¡Listo para alcanzar mis metas académicas!")
             .tz("America/Monterrey")
             .build();
             
         perfilUsuarioRepository.save(perfil);
         
-        // 5. Actualizar la relación bidireccional
+        // 6. Actualizar la relación bidireccional
         usuario.setPerfil(perfil);
         usuarioRepository.save(usuario);
         
+        // 7. Crear verificaciones de email y teléfono
+        String tokenEmail = crearVerificacionEmail(usuario);
+        String codigoTelefono = crearVerificacionTelefono(usuario);
+        
         logger.info("Usuario registrado: {} (ID: {})", usuario.getEmail(), usuario.getId());
+        logger.info("Verificaciones creadas - Email: {}, Teléfono: {}", tokenEmail != null, codigoTelefono != null);
         
         return RegistroResponse.builder()
             .id(usuario.getId())
@@ -86,9 +116,14 @@ public RegistroResponse registrarUsuario(RegistroRequest request) {
             .apellidos(usuario.getApellidos())
             .email(usuario.getEmail())
             .username(usuario.getUsername())
+            .telefono(usuario.getTelefono())
             .activo(usuario.getActivo())
             .creadoEn(usuario.getCreadoEn())
-            .mensaje("Usuario registrado exitosamente")
+            .emailVerificado(usuario.getEmailVerificado())
+            .telefonoVerificado(usuario.getTelefonoVerificado())
+            .requiereVerificacion(true)
+            .tokenEmail(tokenEmail) // Solo para debug - remover en producción
+            .mensaje("Usuario registrado exitosamente. Se han enviado códigos de verificación a tu email y teléfono.")
             .success(true)
             .build();
             
@@ -168,5 +203,156 @@ public RegistroInfoResponse getInformacionRegistro() {
             .fortaleza(fortaleza)
             .checks(checks)
             .build();
+    }
+    
+    // ==========================================================
+    // MÉTODOS DE VERIFICACIÓN
+    // ==========================================================
+    
+    /**
+     * Crear verificación de email
+     */
+    private String crearVerificacionEmail(Usuario usuario) {
+        try {
+            // Eliminar verificaciones anteriores no verificadas
+            verificacionEmailRepository.deleteUnverifiedByUsuario(usuario);
+            
+            // Generar código de 6 dígitos igual que el SMS
+            String codigo = String.format("%06d", (int)(Math.random() * 1000000));
+            
+            // Crear verificación
+            VerificacionEmail verificacion = VerificacionEmail.builder()
+                .codigo(codigo)
+                .email(usuario.getEmail())
+                .usuario(usuario)
+                .expiraEn(LocalDateTime.now().plusHours(24)) // Expira en 24 horas
+                .build();
+                
+            verificacionEmailRepository.save(verificacion);
+            
+            // TODO: Enviar email con el código
+            enviarEmailVerificacion(usuario.getEmail(), codigo);
+            
+            return codigo;
+        } catch (Exception e) {
+            logger.error("Error al crear verificación de email para {}: {}", usuario.getEmail(), e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Crear verificación de teléfono
+     */
+    private String crearVerificacionTelefono(Usuario usuario) {
+        try {
+            // Eliminar verificaciones anteriores no verificadas
+            verificacionTelefonoRepository.deleteUnverifiedByUsuario(usuario);
+            
+            // Generar código de 6 dígitos
+            String codigo = String.format("%06d", (int)(Math.random() * 1000000));
+            
+            // Crear verificación
+            VerificacionTelefono verificacion = VerificacionTelefono.builder()
+                .codigo(codigo)
+                .telefono(usuario.getTelefono())
+                .usuario(usuario)
+                .expiraEn(LocalDateTime.now().plusMinutes(10)) // Expira en 10 minutos
+                .build();
+                
+            verificacionTelefonoRepository.save(verificacion);
+            
+            // TODO: Enviar SMS con el código
+            enviarSMSVerificacion(usuario.getTelefono(), codigo);
+            
+            return codigo;
+        } catch (Exception e) {
+            logger.error("Error al crear verificación de teléfono para {}: {}", usuario.getTelefono(), e.getMessage());
+            return null;
+        }
+    }
+    
+    // ==========================================================
+    // MÉTODOS DE ENVÍO (TEMPORALES - IMPLEMENTAR MÁS TARDE)
+    // ==========================================================
+    
+    /**
+     * Enviar email de verificación (implementación temporal)
+     */
+    private void enviarEmailVerificacion(String email, String codigo) {
+        // TODO: Implementar envío real de email
+        logger.info("[DESARROLLO] Email de verificación enviado a {}: codigo={}", email, codigo);
+        logger.info("[DESARROLLO] Código de verificación: {}", codigo);
+    }
+    
+    /**
+     * Enviar SMS de verificación usando SmsService
+     */
+    private void enviarSMSVerificacion(String telefono, String codigo) {
+        try {
+            boolean enviado = smsService.enviarSmsVerificacion(telefono, codigo);
+            if (enviado) {
+                logger.info("SMS de verificación enviado exitosamente a: {}", telefono);
+            } else {
+                logger.warn("Error al enviar SMS de verificación a: {}", telefono);
+            }
+        } catch (Exception e) {
+            logger.error("Error al enviar SMS de verificación a {}: {}", telefono, e.getMessage());
+        }
+    }
+    
+    /**
+     * Continuar con un registro existente no verificado
+     */
+    private RegistroResponse continuarRegistroExistente(Usuario usuarioExistente, RegistroRequest request) {
+        logger.info("Continuando registro existente para usuario ID: {}", usuarioExistente.getId());
+        
+        try {
+            // Actualizar datos del usuario si es necesario
+            usuarioExistente.setNombre(request.getNombre().trim());
+            usuarioExistente.setApellidos(request.getApellidos() != null && !request.getApellidos().trim().isEmpty() 
+                       ? request.getApellidos().trim() : null);
+            
+            // Actualizar contraseña si es diferente
+            if (!passwordEncoder.matches(request.getContrasena(), usuarioExistente.getContrasenaHash())) {
+                usuarioExistente.setContrasenaHash(passwordEncoder.encode(request.getContrasena()));
+            }
+            
+            // Actualizar perfil si existe
+            if (usuarioExistente.getPerfil() != null) {
+                PerfilUsuario perfil = usuarioExistente.getPerfil();
+                perfil.setPais(request.getPaisNacimiento().trim());
+                perfil.setGenero(request.getGenero());
+                perfil.setFechaNacimiento(request.getFechaNacimiento());
+                perfilUsuarioRepository.save(perfil);
+            }
+            
+            usuarioRepository.save(usuarioExistente);
+            
+            // Reenviar códigos de verificación
+            String tokenEmail = crearVerificacionEmail(usuarioExistente);
+            String codigoTelefono = crearVerificacionTelefono(usuarioExistente);
+            
+            logger.info("Registro existente actualizado para: {} (ID: {})", usuarioExistente.getEmail(), usuarioExistente.getId());
+            
+            return RegistroResponse.builder()
+                .id(usuarioExistente.getId())
+                .nombre(usuarioExistente.getNombre())
+                .apellidos(usuarioExistente.getApellidos())
+                .email(usuarioExistente.getEmail())
+                .username(usuarioExistente.getUsername())
+                .telefono(usuarioExistente.getTelefono())
+                .activo(usuarioExistente.getActivo())
+                .creadoEn(usuarioExistente.getCreadoEn())
+                .emailVerificado(usuarioExistente.getEmailVerificado())
+                .telefonoVerificado(usuarioExistente.getTelefonoVerificado())
+                .requiereVerificacion(true)
+                .mensaje("Se han reenviado los códigos de verificación. Completa tu registro verificando tu email y teléfono.")
+                .success(true)
+                .build();
+                
+        } catch (Exception e) {
+            logger.error("Error al continuar registro existente: {}", e.getMessage(), e);
+            throw new RuntimeException("Error al actualizar registro: " + e.getMessage());
+        }
     }
 }

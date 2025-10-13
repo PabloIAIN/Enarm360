@@ -40,9 +40,21 @@ public class Usuario {
     @Column(length = 120)
     private String apellidos;
     
+    @Column(unique = true, nullable = false, length = 20)
+    private String telefono;
+    
     @Builder.Default
     @Column(nullable = false)
     private Boolean activo = true;
+    
+    // Campos de verificación
+    @Builder.Default
+    @Column(name = "email_verificado", nullable = false)
+    private Boolean emailVerificado = false;
+    
+    @Builder.Default
+    @Column(name = "telefono_verificado", nullable = false)
+    private Boolean telefonoVerificado = false;
     
     @CreationTimestamp
     @Column(name = "creado_en", nullable = false)

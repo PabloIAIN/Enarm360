@@ -39,7 +39,7 @@ public class ProfileService {
                 .apellido(u.getApellidos())
                 .avatar(p != null ? p.getAvatarUrl() : null)
                 .bio(p != null ? p.getBio() : null)
-                .telefono(p != null ? p.getTelefono() : null)
+
                 .pais(p != null ? p.getPais() : null)
                 .tz(p != null ? p.getTz() : "America/Monterrey")
                 // Información personal adicional
@@ -54,7 +54,7 @@ public class ProfileService {
                 .recibirNotificaciones(p != null ? p.getRecibirNotificaciones() : true)
                 .recibirNewsletters(p != null ? p.getRecibirNewsletters() : false)
                 .perfilPublico(p != null ? p.getPerfilPublico() : true)
-                .emailVerificado(p != null ? p.getEmailVerificado() : false)
+
                 // Metadata del sistema
                 .fechaRegistro(u.getCreadoEn())
                 .ultimaActividad(u.getActualizadoEn())
@@ -125,7 +125,6 @@ public class ProfileService {
                 p.setRecibirNotificaciones(true);
                 p.setRecibirNewsletters(false);
                 p.setPerfilPublico(true);
-                p.setEmailVerificado(false);
                 p.setMostrarEmail(false);
                 p.setMostrarTelefono(false);
                 p.setMostrarUniversidad(true);
@@ -139,10 +138,6 @@ public class ProfileService {
             // Actualizar campos del perfil solo si cambiaron
             if (req.getBio() != null && !req.getBio().equals(p.getBio())) {
                 p.setBio(req.getBio());
-                perfilChanged = true;
-            }
-            if (req.getTelefono() != null && !req.getTelefono().equals(p.getTelefono())) {
-                p.setTelefono(req.getTelefono());
                 perfilChanged = true;
             }
             if (req.getPais() != null && !req.getPais().equals(p.getPais())) {

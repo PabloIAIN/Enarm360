@@ -1,7 +1,45 @@
 // ==========================================================
-// TIPOS PARA REGISTRO DE USUARIOS
+// TIPOS PARA REGISTRO POR PASOS
 // ==========================================================
 
+// Paso 1: Datos Personales + Contraseña
+export interface Paso1DatosPersonales {
+  nombre: string;
+  apellidos?: string;
+  username: string;
+  paisNacimiento: string;
+  genero: 'M' | 'F' | 'Otro';
+  fechaNacimiento: string; // ISO format
+  contrasena: string;
+  confirmarContrasena: string;
+}
+
+// Paso 2: Email + Teléfono (incluye datos del paso 1)
+export interface Paso2Contacto extends Paso1DatosPersonales {
+  email: string;
+  telefono: string;
+}
+
+// Respuestas del backend
+export interface Paso1Response {
+  success: boolean;
+  mensaje: string;
+  usernameDisponible: boolean;
+  siguientePaso: string;
+}
+
+export interface Paso2Response {
+  success: boolean;
+  mensaje: string;
+  usuarioId: number;
+  tokenEmail?: string; // Solo para debug
+  codigoTelefono?: string; // Solo para debug
+  siguientePaso: string;
+  requiereVerificacionEmail: boolean;
+  requiereVerificacionTelefono: boolean;
+}
+
+// Tipos legacy (mantener por compatibilidad)
 export interface RegistroRequest {
   username: string;
   email: string;
@@ -154,3 +192,102 @@ export const EMAIL_CONFIG = {
     '10minutemail.com', 'tempmail.org', 'guerrillamail.com'
   ]
 };
+
+// ==========================================================
+// TIPOS PARA WIZARD DE REGISTRO
+// ==========================================================
+
+export interface RegistroWizardStep {
+  id: number;
+  title: string;
+  description: string;
+  isCompleted: boolean;
+  isActive: boolean;
+  isAccessible: boolean;
+}
+
+export interface RegistroWizardData {
+  currentStep: number;
+  totalSteps: number;
+  steps: RegistroWizardStep[];
+  // Datos acumulados
+  paso1?: Paso1DatosPersonales;
+  paso2?: Paso2Contacto;
+  usuarioCreado?: {
+    id: number;
+    email: string;
+    telefono: string;
+  };
+}
+
+// Info del backend para formularios
+export interface RegistroInfo {
+  paises: string[];
+  generos: Record<string, string>;
+  passwordRequirements: {
+    minLength: number;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireNumbers: boolean;
+    mensaje: string;
+  };
+}
+
+// Verificaciones
+export interface VerificacionEmailRequest {
+  codigo: string;
+  email: string;
+}
+
+export interface VerificacionTelefonoRequest {
+  codigo: string;
+  telefono: string;
+}
+
+export interface VerificacionResponse {
+  success: boolean;
+  mensaje: string;
+  verificado: boolean;
+  intentosRestantes?: number;
+}
+
+// Disponibilidad de campos
+export interface DisponibilidadResponse {
+  available: boolean;
+  message: string;
+}
+
+// Constantes para el wizard
+export const WIZARD_STEPS = [
+  {
+    id: 1,
+    title: 'Datos Personales',
+    description: 'Información básica y username'
+  },
+  {
+    id: 2, 
+    title: 'Contacto',
+    description: 'Email y teléfono'
+  },
+  {
+    id: 3,
+    title: 'Verificar Email',
+    description: 'Confirma tu correo electrónico'
+  },
+  {
+    id: 4,
+    title: 'Verificar Teléfono', 
+    description: 'Confirma tu número telefónico'
+  },
+  {
+    id: 5,
+    title: 'Elegir Plan',
+    description: 'Selecciona tu plan de estudio'
+  }
+];
+
+export const GENEROS_OPTIONS = [
+  { value: 'M', label: 'Masculino' },
+  { value: 'F', label: 'Femenino' },
+  { value: 'Otro', label: 'Otro' }
+] as const;

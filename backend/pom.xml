@@ -141,6 +141,19 @@
 			<version>3.0.2</version>
 		</dependency>
 
+		<!-- Para envío de emails -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
+		<!-- Para envío de SMS con Twilio -->
+		<dependency>
+			<groupId>com.twilio.sdk</groupId>
+			<artifactId>twilio</artifactId>
+			<version>10.5.1</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>

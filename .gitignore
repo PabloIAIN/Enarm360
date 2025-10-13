@@ -38,3 +38,11 @@ logs/
 
 ### Scripts ###
 scripts/
+
+### Environment Variables ###
+.env
+.env.local
+.env.production
+backend/.env
+backend/.env.local
+backend/.env.production

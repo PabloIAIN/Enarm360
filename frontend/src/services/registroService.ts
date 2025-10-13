@@ -5,7 +5,17 @@ import {
   RegistroResponse,
   PasswordValidationRequest,
   PasswordValidationResponse,
-  RegistroInfoResponse
+  RegistroInfoResponse,
+  // Nuevos tipos para wizard
+  Paso1DatosPersonales,
+  Paso2Contacto,
+  Paso1Response,
+  Paso2Response,
+  RegistroInfo,
+  DisponibilidadResponse,
+  VerificacionEmailRequest,
+  VerificacionTelefonoRequest,
+  VerificacionResponse
 } from '../types/registro';
 
 const API_BASE = '/api/registro';
@@ -75,6 +85,88 @@ class RegistroService {
       const response = await axios.get<CheckFieldResponse>(`${API_BASE}/check-username`, {
         params: { username }
       });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ==========================================================
+  // MÉTODOS PARA WIZARD DE REGISTRO
+  // ==========================================================
+
+  async validarPaso1(data: Paso1DatosPersonales): Promise<Paso1Response> {
+    try {
+      const response = await axios.post<Paso1Response>(`${API_BASE}/paso1-validar`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async crearCuentaPaso2(data: Paso2Contacto): Promise<Paso2Response> {
+    try {
+      const response = await axios.post<Paso2Response>(`${API_BASE}/paso2-crear-cuenta`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getInfoParaPasos(): Promise<RegistroInfo> {
+    try {
+      const response = await axios.get<RegistroInfo>(`${API_BASE}/paso-info`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async checkUsernameDisponibilidad(username: string): Promise<DisponibilidadResponse> {
+    try {
+      const response = await axios.get<DisponibilidadResponse>(`${API_BASE}/check-username`, {
+        params: { username }
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ==========================================================
+  // MÉTODOS DE VERIFICACIÓN
+  // ==========================================================
+
+  async verificarEmail(data: VerificacionEmailRequest): Promise<VerificacionResponse> {
+    try {
+      const response = await axios.post<VerificacionResponse>(`${API_BASE}/verificar-email`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async verificarTelefono(data: VerificacionTelefonoRequest): Promise<VerificacionResponse> {
+    try {
+      const response = await axios.post<VerificacionResponse>(`${API_BASE}/verificar-telefono`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async reenviarEmailVerificacion(email: string): Promise<any> {
+    try {
+      const response = await axios.post(`${API_BASE}/reenviar-email`, { email });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async reenviarTelefonoVerificacion(telefono: string): Promise<any> {
+    try {
+      const response = await axios.post(`${API_BASE}/reenviar-telefono`, { telefono });
       return response.data;
     } catch (error) {
       throw error;

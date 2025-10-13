@@ -196,6 +196,20 @@ public class AuthService {
     public boolean existsByUsername(String username) {
         return usuarioRepository.existsByUsername(username);
     }
+    
+    /**
+     * Verificar si un teléfono existe
+     */
+    public boolean existsByTelefono(String telefono) {
+        return usuarioRepository.existsByTelefono(telefono);
+    }
+    
+    /**
+     * Buscar usuario por teléfono
+     */
+    public Usuario findByTelefono(String telefono) {
+        return usuarioRepository.findByTelefono(telefono).orElse(null);
+    }
 
     /**
      * Verificar disponibilidad de username o email
@@ -212,6 +226,10 @@ public class AuthService {
             case "email":
                 available = !existsByEmail(value);
                 message = available ? "Email disponible" : "Email ya está en uso";
+                break;
+            case "telefono":
+                available = !existsByTelefono(value);
+                message = available ? "Teléfono disponible" : "Teléfono ya está en uso";
                 break;
             default:
                 message = "Campo no válido";
@@ -258,6 +276,9 @@ public class AuthService {
                 .roles(roles)
                 .permisos(permisos)
                 .activo(usuario.getActivo())
+                .emailVerificado(usuario.getEmailVerificado())
+                .telefonoVerificado(usuario.getTelefonoVerificado())
+                .requiereVerificacion(!usuario.getEmailVerificado() || !usuario.getTelefonoVerificado())
                 .build();
     }
 

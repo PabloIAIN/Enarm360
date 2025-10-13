@@ -26,9 +26,6 @@ public class PerfilUsuario {
     @Column(columnDefinition = "TEXT")
     private String bio;
     
-    @Column(length = 30)
-    private String telefono;
-    
     @Column(length = 80)
     private String pais;
     
@@ -68,10 +65,6 @@ public class PerfilUsuario {
     @Builder.Default
     @Column(name = "perfil_publico")
     private Boolean perfilPublico = true;
-    
-    @Builder.Default
-    @Column(name = "email_verificado")
-    private Boolean emailVerificado = false;
     
     // Configuración de privacidad
     @Builder.Default

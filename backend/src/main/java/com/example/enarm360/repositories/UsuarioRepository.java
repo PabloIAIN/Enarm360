@@ -28,6 +28,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByEmail(String email);
     Optional<Usuario> findByEmailAndActivoTrue(String email);
     Boolean existsByEmail(String email);
+    
+    // Métodos individuales por telefono
+    Optional<Usuario> findByTelefono(String telefono);
+    Optional<Usuario> findByTelefonoAndActivoTrue(String telefono);
+    Boolean existsByTelefono(String telefono);
 
     // Método que busca por username O email
     @Query("SELECT u FROM Usuario u WHERE (u.username = :login OR u.email = :login) AND u.activo = true")

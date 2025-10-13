@@ -14,8 +14,18 @@ public class RegistroResponse {
     private String apellidos;
     private String email;
     private String username;
+    private String telefono;
     private boolean activo;
     private LocalDateTime creadoEn;
     private String mensaje;
     private boolean success;
+    
+    // Estados de verificación
+    private boolean emailVerificado;
+    private boolean telefonoVerificado;
+    
+    // Información adicional para el proceso de verificación
+    private boolean requiereVerificacion;
+    private String tokenEmail; // Solo para desarrollo/debug, no enviar en producción
+    private String tokenVerificacion; // Token para el sistema de registro temporal
 }
