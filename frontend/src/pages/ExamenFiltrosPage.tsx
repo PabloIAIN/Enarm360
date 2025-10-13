@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Text,
@@ -19,6 +19,8 @@ import {
   Avatar,
   ActionIcon,
   Grid,
+  Loader,
+  Center,
 } from '@mantine/core';
 import {
   IconStethoscope,
@@ -31,67 +33,171 @@ import {
 } from '@tabler/icons-react';
 import { authService } from '../services/authService';
 import { examenService } from '../services/examenService';
+import { especialidadService, Especialidad } from '../services/especialidadService';
+import { temaService, Tema } from '../services/temaService';
+import { ExamenEnProgreso } from '../types/examen.types';
+import RecuperarExamenModal from '../components/RecuperarExamenModal';
+import { examenStorage } from '../utils/examenStorage';
 
 const ExamenFiltrosPage: React.FC = () => {
   const navigate = useNavigate();
   const { colorScheme } = useMantineColorScheme();
   const [user] = useState(authService.getCurrentUserFromStorage());
 
-  // Estado de especialidades y configuración
-  const [selectedEspecialidades, setSelectedEspecialidades] = useState<number[]>([]);
+  // Estado de especialidades, temas y configuración
+  const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
+  const [temas, setTemas] = useState<Tema[]>([]);
+  const [cargandoTemas, setCargandoTemas] = useState(true);
+  const [selectedTemas, setSelectedTemas] = useState<number[]>([]); // IDs de los temas seleccionados
   const [numReactivos, setNumReactivos] = useState(10);
-  const [accordionValue, setAccordionValue] = useState<string[]>(["medicina", "pediatria"]);
+  const [selectedDificultad, setSelectedDificultad] = useState<number | null>(null); // 1=FÁCIL, 2=INTERMEDIO, 3=DIFÍCIL
+  const [accordionValue, setAccordionValue] = useState<string[]>([]);
 
-  // Lista completa de especialidades y subespecialidades organizadas
-  const especialidadesCompletas = [
-    // Pediatría y relacionadas
-    { id: 1, nombre: "Pediatría", categoria: "pediatria" },
-    { id: 2, nombre: "Neonatología", categoria: "pediatria" },
-    { id: 3, nombre: "Desarrollo y Crecimiento", categoria: "pediatria" },
+  // Estado para recuperación de examen
+  const [examenEnProgreso, setExamenEnProgreso] = useState<ExamenEnProgreso | null>(null);
+  const [mostrarModalRecuperar, setMostrarModalRecuperar] = useState(false);
+  const [cargandoRecuperacion, setCargandoRecuperacion] = useState(false);
 
-    // Medicina Interna y relacionadas
-    { id: 4, nombre: "Medicina Interna", categoria: "medicina" },
-    { id: 5, nombre: "Neurología", categoria: "medicina" },
-    { id: 6, nombre: "Cardiología", categoria: "medicina" },
-    { id: 7, nombre: "Neumología", categoria: "medicina" },
-    { id: 8, nombre: "Gastroenterología", categoria: "medicina" },
-    { id: 9, nombre: "Nefrología", categoria: "medicina" },
-    { id: 10, nombre: "Infectología", categoria: "medicina" },
-    { id: 11, nombre: "Endocrinología", categoria: "medicina" },
-    { id: 12, nombre: "Reumatología", categoria: "medicina" },
-    { id: 13, nombre: "Hematología", categoria: "medicina" },
-    { id: 14, nombre: "Dermatología", categoria: "medicina" },
-    { id: 15, nombre: "Geriatría", categoria: "medicina" },
-    { id: 16, nombre: "Genética", categoria: "medicina" },
-    { id: 17, nombre: "Oncología", categoria: "medicina" },
-    { id: 18, nombre: "Psiquiatría", categoria: "medicina" },
+  // Cargar especialidades y temas desde el backend
+  useEffect(() => {
+    const cargarDatos = async () => {
+      try {
+        setCargandoTemas(true);
+        const [especialidadesData, temasData] = await Promise.all([
+          especialidadService.listar(),
+          temaService.listar()
+        ]);
+        setEspecialidades(especialidadesData);
+        setTemas(temasData);
+        console.log('✅ Especialidades cargadas:', especialidadesData);
+        console.log('✅ Temas cargados:', temasData);
+      } catch (error) {
+        console.error('Error cargando datos:', error);
+        alert('Error al cargar especialidades y temas');
+      } finally {
+        setCargandoTemas(false);
+      }
+    };
 
-    // Cirugía y relacionadas
-    { id: 19, nombre: "Cirugía General", categoria: "cirugia" },
-    { id: 20, nombre: "Otorrinolaringología", categoria: "cirugia" },
-    { id: 21, nombre: "Urología", categoria: "cirugia" },
-    { id: 22, nombre: "Oftalmología", categoria: "cirugia" },
-    { id: 23, nombre: "Traumatología y Ortopedia", categoria: "cirugia" },
-    { id: 24, nombre: "Coloproctología", categoria: "cirugia" },
+    cargarDatos();
+  }, []);
 
-    // Ginecología y Obstetricia
-    { id: 25, nombre: "Ginecología y Obstetricia", categoria: "gineco" },
-    { id: 26, nombre: "Ginecología", categoria: "gineco" },
-    { id: 27, nombre: "Obstetricia", categoria: "gineco" },
+  // Verificar examen en progreso al cargar
+  useEffect(() => {
+    verificarExamenEnProgreso();
+  }, []);
 
-    // Urgencias y Emergencias
-    { id: 28, nombre: "Urgencias", categoria: "urgencias" },
+  const verificarExamenEnProgreso = async () => {
+    if (!user?.id) {
+      return;
+    }
 
-    // Preventiva
-    { id: 30, nombre: "Vacunas", categoria: "preventiva" },
-  ];
-
-  // Función para obtener especialidades por categoría
-  const getEspecialidadesPorCategoria = (categoria: string) => {
-    return especialidadesCompletas.filter(esp => esp.categoria === categoria);
+    try {
+      const examen = await examenService.verificarExamenEnProgreso(user.id);
+      if (examen) {
+        // Verificar si el tipo de examen coincide con esta página (filtros)
+        if (examen.tipoExamen === 'FILTRADO') {
+          setExamenEnProgreso(examen);
+          setMostrarModalRecuperar(true);
+        } else {
+          // Hay un examen en progreso pero es de otro tipo
+          const continuar = window.confirm(
+            `Tienes un ${examen.nombreExamen} en progreso. ¿Deseas ir a ese examen?`
+          );
+          if (continuar) {
+            if (examen.tipoExamen === 'RAPIDO') {
+              navigate('/estudiante/examen-rapido');
+            } else if (examen.tipoExamen === 'ENARM') {
+              navigate('/estudiante/simulacro');
+            }
+          }
+          // Si dice que no, se queda en la página de filtros
+        }
+      }
+    } catch (error) {
+      console.error('Error verificando examen en progreso:', error);
+    }
   };
 
-  // Configuración de categorías con iconos y metadatos
+  const recuperarExamen = async () => {
+    if (!examenEnProgreso) return;
+
+    setCargandoRecuperacion(true);
+    try {
+      const progreso = await examenService.recuperarProgreso(examenEnProgreso.intentoId);
+
+      // Navegar a la página de examen filtrado con los datos recuperados
+      navigate(`/estudiante/examen-filtrado/${examenEnProgreso.intentoId}`, {
+        state: { 
+          examenData: progreso.examenData,
+          recuperando: true,
+          progreso: {
+            preguntaActual: progreso.preguntaActual,
+            tiempoTranscurrido: progreso.tiempoTranscurrido,
+            pausado: progreso.pausado,
+            respuestas: progreso.respuestas
+          }
+        }
+      });
+
+      console.log('✅ Examen recuperado exitosamente');
+    } catch (error) {
+      console.error('Error recuperando examen:', error);
+      alert('Error al recuperar el examen');
+    } finally {
+      setCargandoRecuperacion(false);
+    }
+  };
+
+  const comenzarNuevoExamen = async () => {
+    if (!examenEnProgreso) return;
+
+    setCargandoRecuperacion(true);
+    try {
+      // Abandonar el examen anterior
+      await examenService.abandonarExamen(examenEnProgreso.intentoId);
+      examenStorage.limpiarProgreso();
+
+      setMostrarModalRecuperar(false);
+      setExamenEnProgreso(null);
+      
+      console.log('✅ Examen anterior abandonado');
+    } catch (error) {
+      console.error('Error abandonando examen:', error);
+      alert('Error al abandonar el examen anterior');
+    } finally {
+      setCargandoRecuperacion(false);
+    }
+  };
+
+  // Mapeo de especialidadId a clave de categoría UI
+  const mapeoEspecialidadACategoria: Record<number, string> = {
+    1: 'pediatria',
+    2: 'medicina',
+    3: 'cirugia',
+    4: 'gineco',
+    5: 'urgencias'
+  };
+
+  // Función para obtener temas por especialidad
+  const getTemasPorEspecialidad = (categoriaKey: string): Tema[] => {
+    // Encontrar el ID de la especialidad basándose en la categoría
+    const especialidadId = Object.entries(mapeoEspecialidadACategoria)
+      .find(([, cat]) => cat === categoriaKey)?.[0];
+
+    if (!especialidadId) return [];
+
+    return temas.filter(tema => tema.especialidadId === parseInt(especialidadId));
+  };
+
+  // Dificultades hardcoded
+  const dificultades = {
+    1: { id: 1, nombre: 'FACIL' },
+    2: { id: 2, nombre: 'INTERMEDIO' },
+    3: { id: 3, nombre: 'DIFICIL' }
+  };
+
+  // Configuración de categorías con iconos y metadatos (solo las 5 categorías reales)
   const categorias = {
     pediatria: {
       nombre: "Pediatría y Desarrollo",
@@ -122,12 +228,6 @@ const ExamenFiltrosPage: React.FC = () => {
       icon: IconShieldCheck,
       color: "#ffb3ff",
       descripcion: "Atención médica inmediata"
-    },
-    preventiva: {
-      nombre: "Medicina Preventiva",
-      icon: IconVaccine,
-      color: "#d4bfff",
-      descripcion: "Prevención y promoción de salud"
     }
   };
 
@@ -137,37 +237,66 @@ const ExamenFiltrosPage: React.FC = () => {
         alert("Usuario no autenticado");
         return;
       }
-      if (selectedEspecialidades.length === 0) {
-        alert("Selecciona al menos una especialidad");
+      if (selectedTemas.length === 0) {
+        alert("Selecciona al menos un tema");
         return;
       }
 
-      const examen = await examenService.generarExamen(
-        selectedEspecialidades,
+      console.log('🚀 Creando examen filtrado...');
+
+      // Construir objeto de dificultad si está seleccionada
+      const dificultadObj = selectedDificultad ? dificultades[selectedDificultad as keyof typeof dificultades] : undefined;
+
+      console.log('📊 Configuración:', {
+        temas: selectedTemas,
         numReactivos,
-        user.id
+        dificultad: dificultadObj?.nombre || 'Todas'
+      });
+
+      // Usar nueva API con examenService.crearExamenFiltrado
+      // NOTA: El backend espera especialidadIds, pero ahora enviamos temaIds (IDs de subespecialidades)
+      const examenData = await examenService.crearExamenFiltrado(
+        user.id,
+        selectedTemas,  // Enviamos IDs de temas en lugar de especialidades
+        numReactivos,
+        undefined, // cantidadCasos (opcional)
+        dificultadObj  // dificultad como objeto {id, nombre}
       );
 
-      if (!examen || !examen.id) {
-        alert("No se pudo generar el examen. Verifica que existan reactivos en la especialidad.");
+      if (!examenData || !examenData.intentoId) {
+        alert("No se pudo generar el examen. Verifica que existan reactivos en las especialidades seleccionadas.");
         return;
       }
 
-      navigate(`/examen/${examen.id}`);
+      console.log('✅ Examen creado:', examenData);
+
+      // Navegar a la página de examen filtrado pasando los datos
+      navigate(`/estudiante/examen-filtrado/${examenData.intentoId}`, {
+        state: { examenData }
+      });
     } catch (error) {
-      console.error("Error generando examen:", error);
+      console.error("❌ Error generando examen:", error);
       alert("Ocurrió un error al generar el examen");
     }
   };
 
   return (
-    <Box
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-      }}
-    >
+    <>
+      <RecuperarExamenModal
+        examen={examenEnProgreso}
+        opened={mostrarModalRecuperar}
+        onContinuar={recuperarExamen}
+        onNuevo={comenzarNuevoExamen}
+        loading={cargandoRecuperacion}
+      />
+      
+      <Box
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100vh',
+        }}
+      >
       <Box
         style={{
           padding: '20px 32px',
@@ -268,6 +397,14 @@ const ExamenFiltrosPage: React.FC = () => {
             </Group>
 
             {/* Accordion de Especialidades */}
+            {cargandoTemas ? (
+              <Center p="xl">
+                <Stack align="center" gap="sm">
+                  <Loader size="lg" />
+                  <Text size="sm" c="dimmed">Cargando temas...</Text>
+                </Stack>
+              </Center>
+            ) : (
             <Accordion
               multiple
               value={accordionValue}
@@ -308,12 +445,12 @@ const ExamenFiltrosPage: React.FC = () => {
               }}
             >
               {Object.entries(categorias).map(([categoriaKey, categoria]) => {
-                const especialidadesCategoria = getEspecialidadesPorCategoria(categoriaKey);
-                if (especialidadesCategoria.length === 0) return null;
+                const temasCat = getTemasPorEspecialidad(categoriaKey);
+                if (temasCat.length === 0) return null;
 
                 const Icon = categoria.icon;
-                const selectedCount = especialidadesCategoria.filter(esp =>
-                  selectedEspecialidades.includes(esp.id)
+                const selectedCount = temasCat.filter(tema =>
+                  selectedTemas.includes(tema.id)
                 ).length;
 
                 return (
@@ -368,23 +505,23 @@ const ExamenFiltrosPage: React.FC = () => {
                               : colorScheme === 'dark' ? '#94a3b8' : '#5a5550',
                           }}
                         >
-                          {selectedCount}/{especialidadesCategoria.length}
+                          {selectedCount}/{temasCat.length}
                         </Badge>
                       </Group>
                     </Accordion.Control>
 
                     <Accordion.Panel>
                       <Group gap="xs">
-                        {especialidadesCategoria.map((esp) => {
-                          const isSelected = selectedEspecialidades.includes(esp.id);
+                        {temasCat.map((tema) => {
+                          const isSelected = selectedTemas.includes(tema.id);
                           return (
                             <Button
-                              key={esp.id}
+                              key={tema.id}
                               onClick={() => {
                                 if (isSelected) {
-                                  setSelectedEspecialidades(prev => prev.filter(id => id !== esp.id));
+                                  setSelectedTemas(prev => prev.filter(id => id !== tema.id));
                                 } else {
-                                  setSelectedEspecialidades(prev => [...prev, esp.id]);
+                                  setSelectedTemas(prev => [...prev, tema.id]);
                                 }
                               }}
                               size="xs"
@@ -408,7 +545,7 @@ const ExamenFiltrosPage: React.FC = () => {
                                 height: 'auto',
                               }}
                             >
-                              {esp.nombre}
+                              {tema.nombre}
                             </Button>
                           );
                         })}
@@ -418,6 +555,7 @@ const ExamenFiltrosPage: React.FC = () => {
                 );
               })}
             </Accordion>
+            )}
           </Stack>
         </Grid.Col>
 
@@ -447,43 +585,137 @@ const ExamenFiltrosPage: React.FC = () => {
                 Configuración
               </Text>
 
-              <NumberInput
-                label="Número de Reactivos"
-                description="Entre 5 y 50 preguntas"
-                value={numReactivos}
-                onChange={(val) => setNumReactivos(Number(val) || 10)}
-                min={5}
-                max={50}
-                size="md"
-                styles={{
-                  root: {
-                    textAlign: 'left',
-                  },
-                  label: {
-                    color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26',
-                    fontFamily: 'Inter, sans-serif',
-                    fontWeight: 500,
-                    fontSize: '14px',
-                    textAlign: 'left',
-                  },
-                  description: {
-                    color: colorScheme === 'dark' ? '#94a3b8' : '#5a5550',
-                    fontFamily: 'Inter, sans-serif',
-                    fontSize: '12px',
-                    textAlign: 'left',
-                  },
-                  input: {
-                    backgroundColor: colorScheme === 'dark'
-                      ? 'rgba(255, 255, 255, 0.05)'
-                      : 'rgba(242, 237, 230, 0.5)',
-                    border: `1px solid ${colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(221, 216, 209, 0.5)'}`,
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26',
-                    textAlign: 'left',
-                  },
-                }}
-              />
+              <Stack gap="md">
+                <NumberInput
+                  label="Número de Reactivos"
+                  description="Entre 5 y 50 preguntas"
+                  value={numReactivos}
+                  onChange={(val) => setNumReactivos(Number(val) || 10)}
+                  min={5}
+                  max={50}
+                  size="md"
+                  styles={{
+                    root: {
+                      textAlign: 'left',
+                    },
+                    label: {
+                      color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26',
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      textAlign: 'left',
+                    },
+                    description: {
+                      color: colorScheme === 'dark' ? '#94a3b8' : '#5a5550',
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: '12px',
+                      textAlign: 'left',
+                    },
+                    input: {
+                      backgroundColor: colorScheme === 'dark'
+                        ? 'rgba(255, 255, 255, 0.05)'
+                        : 'rgba(242, 237, 230, 0.5)',
+                      border: `1px solid ${colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(221, 216, 209, 0.5)'}`,
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26',
+                      textAlign: 'left',
+                    },
+                  }}
+                />
+
+                {/* Selector de Dificultad */}
+                <Box>
+                  <Text
+                    size="sm"
+                    fw={500}
+                    mb="xs"
+                    style={{
+                      color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26',
+                      fontFamily: 'Inter, sans-serif',
+                      textAlign: 'left',
+                    }}
+                  >
+                    Dificultad
+                  </Text>
+                  <Text
+                    size="xs"
+                    mb="sm"
+                    style={{
+                      color: colorScheme === 'dark' ? '#94a3b8' : '#5a5550',
+                      fontFamily: 'Inter, sans-serif',
+                      textAlign: 'left',
+                    }}
+                  >
+                    Opcional - Filtra por nivel de dificultad
+                  </Text>
+                  <Group gap="xs">
+                    <Button
+                      variant={selectedDificultad === 1 ? "filled" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedDificultad(selectedDificultad === 1 ? null : 1)}
+                      style={{
+                        backgroundColor: selectedDificultad === 1
+                          ? '#22c55e'
+                          : 'transparent',
+                        borderColor: selectedDificultad === 1
+                          ? '#22c55e'
+                          : colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(148, 163, 184, 0.4)',
+                        color: selectedDificultad === 1
+                          ? '#ffffff'
+                          : colorScheme === 'dark' ? '#94a3b8' : '#64748b',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Fácil
+                    </Button>
+                    <Button
+                      variant={selectedDificultad === 2 ? "filled" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedDificultad(selectedDificultad === 2 ? null : 2)}
+                      style={{
+                        backgroundColor: selectedDificultad === 2
+                          ? '#f59e0b'
+                          : 'transparent',
+                        borderColor: selectedDificultad === 2
+                          ? '#f59e0b'
+                          : colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(148, 163, 184, 0.4)',
+                        color: selectedDificultad === 2
+                          ? '#ffffff'
+                          : colorScheme === 'dark' ? '#94a3b8' : '#64748b',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Intermedio
+                    </Button>
+                    <Button
+                      variant={selectedDificultad === 3 ? "filled" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedDificultad(selectedDificultad === 3 ? null : 3)}
+                      style={{
+                        backgroundColor: selectedDificultad === 3
+                          ? '#ef4444'
+                          : 'transparent',
+                        borderColor: selectedDificultad === 3
+                          ? '#ef4444'
+                          : colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(148, 163, 184, 0.4)',
+                        color: selectedDificultad === 3
+                          ? '#ffffff'
+                          : colorScheme === 'dark' ? '#94a3b8' : '#64748b',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Difícil
+                    </Button>
+                  </Group>
+                </Box>
+              </Stack>
             </Card>
 
             {/* Summary Card */}
@@ -512,10 +744,10 @@ const ExamenFiltrosPage: React.FC = () => {
               <Stack gap="sm" style={{ textAlign: 'left' }}>
                 <Group justify="space-between">
                   <Text size="sm" style={{ color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
-                    Especialidades:
+                    Temas:
                   </Text>
                   <Text size="sm" fw={600} style={{ color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26', fontFamily: 'Inter, sans-serif', textAlign: 'right' }}>
-                    {selectedEspecialidades.length}
+                    {selectedTemas.length}
                   </Text>
                 </Group>
 
@@ -525,6 +757,15 @@ const ExamenFiltrosPage: React.FC = () => {
                   </Text>
                   <Text size="sm" fw={600} style={{ color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26', fontFamily: 'Inter, sans-serif', textAlign: 'right' }}>
                     {numReactivos}
+                  </Text>
+                </Group>
+
+                <Group justify="space-between">
+                  <Text size="sm" style={{ color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
+                    Dificultad:
+                  </Text>
+                  <Text size="sm" fw={600} style={{ color: colorScheme === 'dark' ? '#e2e8f0' : '#2d2a26', fontFamily: 'Inter, sans-serif', textAlign: 'right' }}>
+                    {selectedDificultad ? (selectedDificultad === 1 ? 'Fácil' : selectedDificultad === 2 ? 'Intermedio' : 'Difícil') : 'Todas'}
                   </Text>
                 </Group>
 
@@ -544,9 +785,9 @@ const ExamenFiltrosPage: React.FC = () => {
               fullWidth
               size="lg"
               onClick={handleGenerarExamen}
-              disabled={selectedEspecialidades.length === 0}
+              disabled={selectedTemas.length === 0}
               style={{
-                backgroundColor: selectedEspecialidades.length > 0
+                backgroundColor: selectedTemas.length > 0
                   ? colorScheme === 'dark' ? '#0ea5e9' : '#8b7355'
                   : '#6b7280',
                 fontSize: '16px',
@@ -585,7 +826,8 @@ const ExamenFiltrosPage: React.FC = () => {
           © 2024 ENARM360. Todos los derechos reservados.
         </Text>
       </Box>
-    </Box>
+      </Box>
+    </>
   );
 };
 

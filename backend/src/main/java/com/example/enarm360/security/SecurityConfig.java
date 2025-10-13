@@ -77,6 +77,7 @@ public SecurityFilterChain filterChain(HttpSecurity http,
 
             .requestMatchers("/api/examenes/**").authenticated()
             .requestMatchers("/estudiante/simulador/**").permitAll()
+            .requestMatchers("/api/quejas-sugerencias/**").authenticated()
 
             .requestMatchers(
     "/", 

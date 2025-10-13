@@ -21,6 +21,8 @@ import RegisterPage from './pages/RegisterPage';
 import SimuladorPage from './pages/SimuladorPage';
 import ExamenRapidoPage from './pages/ExamenRapidoPage';
 import ExamenFiltrosPage from './pages/ExamenFiltrosPage';
+import ExamenFiltradoPage from './pages/ExamenFiltradoPage';
+import ExamenSimulacroPage from './pages/ExamenSimulacroPage';
 import SimulacionCompletaPage from './pages/SimulacionCompletaPage';
 import RepasoInteligentePage from './pages/RepasoInteligentePage';
 import EstadisticasPage from './pages/EstadisticasPage';
@@ -39,7 +41,7 @@ import PermissionsAdminPage from './pages/admin/PermissionsAdminPage';
 import ResultadosPage from './pages/ResultadosPage';
 
 //Páginas de examen
-import ExamenPage from './pages/ExamenPage';
+// import ExamenPage from './pages/ExamenPage';
 
 import './App.css';
 import '@mantine/core/styles.css';
@@ -136,7 +138,8 @@ function App() {
                 <Route path="/estudiante/simulador" element={<ProtectedRoute requiredRole="ESTUDIANTE"><SimuladorPage /></ProtectedRoute>} />
                 <Route path="/estudiante/simulador/rapido" element={<ProtectedRoute requiredRole="ESTUDIANTE"><ExamenRapidoPage /></ProtectedRoute>} />
                 <Route path="/estudiante/simulador/filtros" element={<ProtectedRoute requiredRole="ESTUDIANTE"><ExamenFiltrosPage /></ProtectedRoute>} />
-                <Route path="/estudiante/simulador/completo" element={<ProtectedRoute requiredRole="ESTUDIANTE"><SimulacionCompletaPage /></ProtectedRoute>} />
+                <Route path="/estudiante/examen-filtrado/:intentoId" element={<ProtectedRoute requiredRole="ESTUDIANTE"><ExamenFiltradoPage /></ProtectedRoute>} />
+                <Route path="/estudiante/simulador/completo" element={<ProtectedRoute requiredRole="ESTUDIANTE"><ExamenSimulacroPage /></ProtectedRoute>} />
                 <Route path="/estudiante/simulador/inteligente" element={<ProtectedRoute requiredRole="ESTUDIANTE"><RepasoInteligentePage /></ProtectedRoute>} />
                 <Route path="/estudiante/estadisticas" element={<ProtectedRoute requiredRole="ESTUDIANTE"><EstadisticasPage /></ProtectedRoute>} />
                 <Route path="/estudiante/rankings" element={<ProtectedRoute requiredRole="ESTUDIANTE"><RankingsPage /></ProtectedRoute>} />
@@ -155,8 +158,9 @@ function App() {
 
               {/* Rutas de examen con layout sin distracciones */}
               <Route element={<ProtectedRoute><ExamLayout /></ProtectedRoute>}>
-                <Route path="/examen/:id" element={<ProtectedRoute requiredRole="ESTUDIANTE"><ExamenPage /></ProtectedRoute>} />
+                {/* <Route path="/examen/:id" element={<ProtectedRoute requiredRole="ESTUDIANTE"><ExamenPage /></ProtectedRoute>} /> */}
                 <Route path="/examenes/:intentoId/resultado" element={<ProtectedRoute requiredRole="ESTUDIANTE"><ResultadosPage /></ProtectedRoute>} />
+                <Route path="/estudiante/resultados/:intentoId" element={<ProtectedRoute requiredRole="ESTUDIANTE"><ResultadosPage /></ProtectedRoute>} />
               </Route>
 
               {/* Mejorar plan y checkout (sin sidebar / header) */}

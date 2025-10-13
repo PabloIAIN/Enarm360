@@ -52,10 +52,7 @@ public class Reactivo {
     private String respuestaCorrecta;
     
     // Relaciones
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "clave_id", nullable = false)
-    @JsonIgnoreProperties({"reactivos", "preguntasCasos"})
-    private Clave clave;
+    
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dificultad_id", nullable = false)

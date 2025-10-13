@@ -24,10 +24,7 @@ public class Especialidad {
     @NotBlank(message = "El nombre de la especialidad es obligatorio")
     private String nombre;
 
-    // Relación con claves
-    @OneToMany(mappedBy = "especialidad", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnoreProperties({"especialidad", "reactivos", "preguntasCasos"})
-    private List<Clave> claves;
+   
 
     // Relación con reactivos
     @OneToMany(mappedBy = "especialidad", fetch = FetchType.LAZY)

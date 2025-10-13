@@ -6,26 +6,26 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-
-
 @Entity
 @Table(name = "casos_de_estudio")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class CasoEstudio {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    // Removido id_caso ya que no existe en la tabla actual
     
     @Column(nullable = false, columnDefinition = "TEXT")
     @NotBlank(message = "El contenido del caso es obligatorio")
@@ -34,18 +34,44 @@ public class CasoEstudio {
     @Column(length = 255)
     private String imagen;
     
-    // Relación con usuario (tu entidad Usuario ya existente)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tema_id")
+    @JsonIgnoreProperties({"casosEstudio", "hibernateLazyInitializer", "handler"})
+    private Tema tema;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_usuario", nullable = false)
-    @JsonIgnoreProperties({"casosEstudio", "reactivos", "preguntasCasos"})
+    @JsonIgnoreProperties({"casosEstudio", "reactivos", "preguntasCasos", "hibernateLazyInitializer", "handler"})
     private Usuario usuario;
     
     @Column(name = "fecha_hora", nullable = false)
     @CreationTimestamp
     private LocalDateTime fechaHora;
     
-    // Relación con preguntas del caso
     @OneToMany(mappedBy = "casoEstudio", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnoreProperties("casoEstudio")
-    private List<PreguntaCaso> preguntas;
+    @JsonIgnoreProperties({"casoEstudio", "hibernateLazyInitializer", "handler"})
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @Builder.Default
+    private List<PreguntaCaso> preguntas = new ArrayList<>();
+
+    @OneToMany(mappedBy = "casoEstudio", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"casoEstudio", "examen", "hibernateLazyInitializer", "handler"})
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @Builder.Default
+    private List<ExamenCaso> examenesQueUsan = new ArrayList<>();
+    
+    @Transient
+    public int getCantidadPreguntas() {
+        return preguntas != null ? preguntas.size() : 0;
+    }
+    
+    @Transient
+    public Long getTemaIdDesdePreguntas() {
+        if (preguntas != null && !preguntas.isEmpty() && preguntas.get(0).getEspecialidad() != null) {
+            return preguntas.get(0).getEspecialidad().getId();
+        }
+        return null;
+    }
 }

@@ -60,10 +60,7 @@ public class PreguntaCaso {
     @JsonIgnoreProperties("preguntas")
     private CasoEstudio casoEstudio;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "clave_id", nullable = false)
-    @JsonIgnoreProperties({"reactivos", "preguntasCasos"})
-    private Clave clave;
+   
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "especialidad_id", nullable = false)

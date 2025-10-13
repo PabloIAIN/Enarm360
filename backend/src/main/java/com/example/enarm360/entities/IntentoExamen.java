@@ -36,6 +36,23 @@ public class IntentoExamen {
     @Column(name = "puntaje_total")
     private Double puntajeTotal;
 
+    // Nuevos campos para persistencia de progreso
+    @Column(name = "estado")
+    @Builder.Default
+    private String estado = "EN_PROGRESO"; // EN_PROGRESO, FINALIZADO, ABANDONADO
+
+    @Column(name = "pregunta_actual")
+    @Builder.Default
+    private Integer preguntaActual = 0;
+
+    @Column(name = "tiempo_transcurrido")
+    @Builder.Default
+    private Integer tiempoTranscurrido = 0;
+
+    @Column(name = "pausado")
+    @Builder.Default
+    private Boolean pausado = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "examen_id")
     private Examen examen;

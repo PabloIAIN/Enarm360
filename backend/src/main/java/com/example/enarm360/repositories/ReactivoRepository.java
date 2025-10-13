@@ -1,6 +1,5 @@
 package com.example.enarm360.repositories;
 
-
 import com.example.enarm360.entities.Reactivo;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -12,25 +11,29 @@ import java.util.List;
 @Repository
 public interface ReactivoRepository extends JpaRepository<Reactivo, Long> {
 
-    List<Reactivo> findByEspecialidad_Id(Long especialidadId);
+    // Query sin filtros
+    @Query(value = "SELECT * FROM reactivos ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
+    List<Reactivo> findRandomReactivos(@Param("limit") int limit);
 
-    List<Reactivo> findByDificultad_Id(Long dificultadId);
+    // Query con filtros de especialidad
+    @Query(value = "SELECT * FROM reactivos WHERE especialidad_id IN :especialidadIds ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
+    List<Reactivo> findRandomByEspecialidades(
+        @Param("especialidadIds") List<Long> especialidadIds,
+        @Param("limit") int limit
+    );
 
-    List<Reactivo> findByUsuario_Id(Long usuarioId);
+    // Query con filtros de especialidad y dificultad
+    @Query(value = "SELECT * FROM reactivos WHERE especialidad_id IN :especialidadIds AND dificultad_id = :dificultadId ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
+    List<Reactivo> findRandomByEspecialidadesAndDificultad(
+        @Param("especialidadIds") List<Long> especialidadIds,
+        @Param("dificultadId") Long dificultadId,
+        @Param("limit") int limit
+    );
 
-    // Seleccionar reactivos aleatorios de una especialidad
-
-
-
-    
-    @Query(value = "SELECT * FROM reactivos WHERE especialidad_id = :especialidadId ORDER BY RANDOM() LIMIT :num", 
-           nativeQuery = true)
-    List<Reactivo> findRandomByEspecialidad(@Param("especialidadId") Long especialidadId,
-                                            @Param("num") int num);
-
-
-
-  @Query("SELECT r FROM Reactivo r WHERE r.examen.id = :examenId")
-    List<Reactivo> findByExamenId(@Param("examenId") Long examenId);
-
+    // Query solo con filtro de dificultad
+    @Query(value = "SELECT * FROM reactivos WHERE dificultad_id = :dificultadId ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
+    List<Reactivo> findRandomByDificultad(
+        @Param("dificultadId") Long dificultadId,
+        @Param("limit") int limit
+    );
 }
