@@ -51,7 +51,6 @@ axios.defaults.headers.common['Accept'] = 'application/json';
 
 // Endpoints públicos que NO requieren autenticación
 const PUBLIC_ENDPOINTS = [
-  '/api/subscription-plans',
   '/api/registro/crear-cuenta',
   '/api/auth/login',
   '/api/auth/refresh'
